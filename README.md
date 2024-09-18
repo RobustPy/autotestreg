@@ -78,8 +78,6 @@ Otherwise, AutoTest!Reg will give you the function whose behavior was changed.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- CONTRIBUTING -->
 ## Contributing
 _(Section in english)_  
