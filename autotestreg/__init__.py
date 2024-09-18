@@ -1,10 +1,12 @@
 """
 Automatically test your functions to see if you have changed their behavior by mistake!
 """
+
 # from sys import modules
 # from types import ModuleType
-from autotestreg.autotestreg.autotest import autotest_func, autotest_module
-__all__ = ['autotest_func', 'autotest_module']
+from autotestreg.autotest import autotest_func, autotest_module
+
+__all__ = ["autotest_func", "autotest_module"]
 
 
 # class CallableModule(ModuleType):

@@ -85,6 +85,8 @@ Otherwise, AutoTest!Reg will give you the function whose behavior was changed.
 _(Section in english)_  
 I want to add a lot of functionnalities to this project, but I don't have much time to work on it. Contributions are welcome!  
 
+To install in dev mode, use `pip install -e .`
+
 <!-- ROADMAP-->
 ### Roadmap/todo
 <!-- table with columns : task, importance, difficulty, status, description -->
