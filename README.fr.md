@@ -81,6 +81,20 @@ Sinon, AutoTest!Reg vous donnera la fonction dont le comportement a été modifi
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 -->
 
+
+## Usage avancé
+Vous pouvez utiliser AutoTest!Reg comme un pre-commit hook:
+1. Créez des fichiers de test en utilisant `autotestreg` (par exemple `some_tests.py`)
+  - Ce fichier doit contenir en haut `from autotestreg import set_interactive` et `set_interactive(False)`
+2. Modifiez le script de pre-commit hook: `touch .git/hooks/pre-commit`
+3. Ajoutez ceci à l'intérieur:
+```bash
+#!/bin/sh
+# N'oubliez pas d'activer votre env si nécessaire.
+python some_tests.py
+```
+4. Rendez le fichier pre-commit exécutable: `chmod +x .git/hooks/pre-commit`
+
 <!-- CONTRIBUTING -->
 ## Contributing
 _(Section in english)_  

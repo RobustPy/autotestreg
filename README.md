@@ -76,6 +76,19 @@ If no regression was introduced when you modified the code, your tests will pass
 
 Otherwise, AutoTest!Reg will give you the function whose behavior was changed.
 
+## Advanced usage
+You can use AutoTest!Reg as a pre-commit hook:  
+1. Create some test files using `autotestreg` (e.g. `some_tests.py`)
+  - This file must contain at the top `from autotestreg import set_interactive` and `set_interactive(False)`
+2. Modify the pre-commit hook script: `touch .git/hooks/pre-commit`
+3. Add this inside:
+```bash
+#!/bin/sh
+# Dont forget to activate your env if needed.
+python some_tests.py
+```
+4. Make the pre-commit file executable: `chmod +x .git/hooks/pre-commit`
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->

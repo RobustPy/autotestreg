@@ -8,6 +8,17 @@ import sys
 import argparse
 import shutil
 
+INTERACTIVE = True
+
+
+def set_interactive(interactive: bool = True) -> None:
+    """
+    Set the interactive mode.
+    :param interactive: whether to run in interactive mode
+    """
+    global INTERACTIVE
+    INTERACTIVE = interactive
+
 
 class Hash:
     def __init__(self, hash: int) -> None:
@@ -98,13 +109,18 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
                     # If function code has changed, ask the user if they want to ignore the change
                     ignore = False
                     if code_hash != old_code_hash:
-                        answered = False
-                        while not answered:
-                            answer = input(
-                                "Function code changed in " + func.__module__ + "/" + func.__name__ + ". Ignore? [y/n] "
-                            ).lower()
-                            answered = answer in {"y", "n"}
-                        ignore = answer == "y"
+                        if INTERACTIVE:
+                            answered = False
+                            while not answered:
+                                answer = input(
+                                    "Function code changed in "
+                                    + func.__module__
+                                    + "/"
+                                    + func.__name__
+                                    + ". Ignore? [y/n] "
+                                ).lower()
+                                answered = answer in {"y", "n"}
+                            ignore = answer == "y"
 
                     if ignore:  # We accept the change, hence we delete the old data
                         all_inputs.pop(index)
