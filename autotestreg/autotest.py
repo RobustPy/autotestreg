@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import inspect
 import os
 import pickle
@@ -10,9 +9,9 @@ import argparse
 import shutil
 
 
-@dataclass
 class Hash:
-    hash: int
+    def __init__(self, hash: int) -> None:
+        self.hash = hash
 
     def __repr__(self):
         return str(self.hash)
@@ -51,11 +50,11 @@ def index_in_list(list_: List, item: Any) -> int:
     return -1
 
 
-@dataclass
 class FunctionAutoTest:
-    all_inputs: List[Any]
-    all_outputs: List[Any]
-    code_hash: int
+    def __init__(self, all_inputs: List[Any], all_outputs: List[Any], code_hash: int) -> None:
+        self.all_inputs = all_inputs
+        self.all_outputs = all_outputs
+        self.code_hash = code_hash
 
 
 def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> Callable:
