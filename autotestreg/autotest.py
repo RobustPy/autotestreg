@@ -6,6 +6,8 @@ from typing import Callable, List, Any
 from types import ModuleType
 import difflib
 import sys
+import argparse
+import shutil
 
 
 @dataclass
@@ -92,21 +94,33 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
                 all_outputs = fn_autotest_data.all_outputs
                 old_code_hash = fn_autotest_data.code_hash
 
-                if code_hash != old_code_hash:
-                    print("Function code changed in " + func.__module__ + "/" + func.__name__)
-
                 index = index_in_list(all_inputs, inputs)
                 if index >= 0:
-                    old_output = all_outputs[index]
-                    if is_equal(old_output, outputs):
-                        return outputs
+                    # If function code has changed, ask the user if they want to ignore the change
+                    ignore = False
+                    if code_hash != old_code_hash:
+                        answered = False
+                        while not answered:
+                            answer = input(
+                                "Function code changed in " + func.__module__ + "/" + func.__name__ + ". Ignore? [y/n] "
+                            ).lower()
+                            answered = answer in {"y", "n"}
+                        ignore = answer == "y"
+
+                    if ignore:  # We accept the change, hence we delete the old data
+                        all_inputs.pop(index)
+                        all_outputs.pop(index)
                     else:
-                        diff_results = difflib.unified_diff(
-                            str(old_output).splitlines(keepends=True), str(outputs).splitlines(keepends=True)
-                        )
-                        sys.stderr.write("".join(diff_results))
-                        # fail the test
-                        raise AssertionError("Output changed in " + func.__module__ + "/" + func.__name__)
+                        old_output = all_outputs[index]
+                        if is_equal(old_output, outputs):
+                            return outputs
+                        else:
+                            diff_results = difflib.unified_diff(
+                                str(old_output).splitlines(keepends=True), str(outputs).splitlines(keepends=True)
+                            )
+                            sys.stderr.write("".join(diff_results))
+                            # fail the test
+                            raise AssertionError("Output changed in " + func.__module__ + "/" + func.__name__)
         else:
             all_inputs = []
             all_outputs = []
@@ -143,3 +157,15 @@ def autotest_module(module: ModuleType):
                     and m_obj.__module__ == module.__name__
                 ):
                     setattr(obj, method_name, autotest_func(m_obj))
+
+
+def cmd():
+    parser = argparse.ArgumentParser(description="AutoTest Command Line Tool")
+    parser.add_argument("command", choices=["delete"], help="Command to execute")
+    parser.add_argument("target", choices=["cache"], help="Target to apply command to")
+    parser.add_argument("--cache", "-C", help="Specify cache folder", default="autotestreg_data")
+    args = parser.parse_args()
+
+    if args.command == "delete" and args.target == "cache":
+        shutil.rmtree(args.cache, ignore_errors=True)
+        print("Cache deleted successfully (" + args.cache + ")")
