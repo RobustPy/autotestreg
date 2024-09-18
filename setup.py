@@ -10,9 +10,10 @@ setup(
             "autotest=autotestreg.autotest:cmd",
         ],
     },
-    version="0.1.1",
+    version="0.2.0",
     description="Automatically test your functions to see if you have changed their behavior by mistake!",
     author="Nicolas Micaux",
+    author_email="micaux.nicolas@gmail.com",
     url="https://github.com/NicolasMICAUX/autotestreg",
     install_requires=[],  # None
     keywords=["test", "regression", "automatically"],
