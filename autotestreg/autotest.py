@@ -49,6 +49,13 @@ def index_in_list(list_: List, item: Any) -> int:
     return -1
 
 
+@dataclass
+class FunctionAutoTest:
+    all_inputs: List[Any]
+    all_outputs: List[Any]
+    code_hash: int
+
+
 def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> Callable:
     """
     Replace the function with a wrapper than runs the function but
@@ -70,6 +77,7 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
         """
         inputs = (args, kwargs)
         outputs = func(*args, **kwargs)
+        code_hash = inspect.getsource(func)
 
         # This saves ressources but makes the errors messages less readable
         # inputs = hash_if_possible(inputs)
@@ -79,7 +87,14 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
 
         if os.path.exists(file_path):
             with open(file_path, "rb") as f:
-                all_inputs, all_outputs = pickle.load(f)
+                fn_autotest_data = pickle.load(f)
+                all_inputs = fn_autotest_data.all_inputs
+                all_outputs = fn_autotest_data.all_outputs
+                old_code_hash = fn_autotest_data.code_hash
+
+                if code_hash != old_code_hash:
+                    print("Function code changed in " + func.__module__ + "/" + func.__name__)
+
                 index = index_in_list(all_inputs, inputs)
                 if index >= 0:
                     old_output = all_outputs[index]
@@ -100,7 +115,7 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
         all_inputs.append(inputs)
         all_outputs.append(outputs)
         with open(file_path, "wb") as f:
-            pickle.dump((all_inputs, all_outputs), f)
+            pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
 
         return outputs
 
