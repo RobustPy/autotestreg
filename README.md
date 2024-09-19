@@ -117,6 +117,7 @@ See the [open issues](https://github.com/NicolasMICAUX/autotestreg/issues) for a
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!--
 ### How to contribute
 Contributing is an awesome way to learn, inspire, and help others. Any contributions you make are **greatly appreciated**, even if it's just about styling and best practices.
 
@@ -128,7 +129,7 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
+-->
 
 ## Authors
 This library was created by [Nicolas MICAUX](https://github.com/NicolasMICAUX).
