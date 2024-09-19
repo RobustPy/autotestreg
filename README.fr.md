@@ -96,6 +96,7 @@ python some_tests.py
 4. Rendez le fichier pre-commit exécutable: `chmod +x .git/hooks/pre-commit`
 
 <!-- CONTRIBUTING -->
+<!--
 ## Contributing
 _(Section in english)_  
 I want to add a lot of functionnalities to this project, but I don't have much time to work on it. Contributions are welcome!  
@@ -130,7 +131,7 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
+-->
 
 ## Auteurs
 Cette librairie a été crée par [Nicolas MICAUX](https://github.com/NicolasMICAUX).
