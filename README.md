@@ -101,7 +101,6 @@ To install in dev mode, use `pip install -e .`
 <!-- ROADMAP-->
 <!--
 ### Roadmap/todo
-<!-- table with columns : task, importance, difficulty, status, description -->
 | Task | Importance | Difficulty | Contributor on it | Description  |
 |:-----|------------|------------|-------------------|:-------------|
 |      | ./5        | ./5        | NOBODY            | _e.g._ : ... |
