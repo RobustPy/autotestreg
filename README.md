@@ -99,6 +99,7 @@ I want to add a lot of functionnalities to this project, but I don't have much t
 To install in dev mode, use `pip install -e .`
 
 <!-- ROADMAP-->
+<!--
 ### Roadmap/todo
 <!-- table with columns : task, importance, difficulty, status, description -->
 | Task | Importance | Difficulty | Contributor on it | Description  |
@@ -114,10 +115,11 @@ Non-Code contribution :
 
 _For every todo, just click on the link to find the discussion where I describe how I would do it._  
 See the [open issues](https://github.com/NicolasMICAUX/autotestreg/issues) for a full list of proposed features (and known issues).
+-->
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!--
+
 ### How to contribute
 Contributing is an awesome way to learn, inspire, and help others. Any contributions you make are **greatly appreciated**, even if it's just about styling and best practices.
 
@@ -129,7 +131,6 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
--->
 
 ## Authors
 This library was created by [Nicolas MICAUX](https://github.com/NicolasMICAUX).
