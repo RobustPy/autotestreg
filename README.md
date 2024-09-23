@@ -70,18 +70,19 @@ import mypackage
 autotest_module(mypackage)
 ```
 
-<!-- USAGE EXAMPLES -->
-## Then
+In your tests, juste use your functions to trigger Autotest!Reg smart regresion testing. 
+
+## Results
 If no regression was introduced when you modified the code, your tests will pass.  
 Otherwise, AutoTest!Reg will give you the function whose behavior was changed.  
-```bash
+```
 AutotestError: Output changed in mypackage.file1/function1, for input x=1
 @@ -3 +3 @@
 -old+new
 ```
 
-**NB**: You just need to use your functions to trigger Autotest!Reg smart regresion testing.  
-The real power of Autotest! lies here, you are not forced to write tons of code to explicitly call all of your functions. If you have a main function that recursively calls all sub-functions in the module, Autotest!reg will still track and check all sub-functions for regressions!
+## The true power of Autotest!
+The real power of Autotest! lies here: you are not forced to write tons of code to explicitly call all of your functions. If you have a main function that recursively calls all sub-functions in the module, Autotest!reg will still track and check all sub-functions for regressions!
 ```python
 # before, you needed to explicitely to call all functions that neeeded tests and assert their results
 assert fonc1(...) == { ... }
