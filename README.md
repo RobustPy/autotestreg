@@ -47,7 +47,7 @@ Install AutoTest!Reg with pip :
 pip install autotestreg
 ```
 
-Import AutoTest!Reg into your tests, adding this line:
+**Import AutoTest!Reg into your tests**, adding this line:
 ```python
 import autotestreg
 ```
@@ -71,10 +71,30 @@ autotest_module(mypackage)
 ```
 
 <!-- USAGE EXAMPLES -->
-## Next
-If no regression was introduced when you modified the code, your tests will pass.
+## Then
+If no regression was introduced when you modified the code, your tests will pass.  
+Otherwise, AutoTest!Reg will give you the function whose behavior was changed.  
+```bash
+AutotestError: Output changed in mypackage.file1/function1, for input x=1
+@@ -3 +3 @@
+-old+new
+```
 
-Otherwise, AutoTest!Reg will give you the function whose behavior was changed.
+**NB**: You just need to use your functions to trigger Autotest!Reg smart regresion testing.  
+The real power of Autotest! lies here, you are not forced to write tons of code to explicitly call all of your functions. If you have a main function that recursively calls all sub-functions in the module, Autotest!reg will still track and check all sub-functions for regressions!
+```python
+# before, you needed to explicitely to call all functions that neeeded tests and assert their results
+assert fonc1(...) == { ... }
+obj = Object2(...)
+assert obj2.method1(...) == ...
+
+# now, just call your main function, after registering your module
+from autotestreg import autotest_module
+import mypackage
+
+autotest_module(mypackage)
+mypackage.main()
+```
 
 ## Advanced usage
 You can use AutoTest!Reg as a pre-commit hook:  
