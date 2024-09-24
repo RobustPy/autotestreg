@@ -153,8 +153,8 @@ Don't forget to give the project a star! Thanks again!
 5. Open a Pull Request
 
 ## Authors
-This library was created by [Nicolas MICAUX](https://github.com/NicolasMICAUX).
-
+This library was created by [Nicolas MICAUX](https://github.com/NicolasMICAUX).  
+You might also be interested by [foolproof](https://github.com/RobustPy/foolproof)  
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
