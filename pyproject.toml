@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autotestreg"
+version = "0.3.1"
+description = "Automatically test your functions to see if you have changed their behavior by mistake!"
+readme = "README.md"
+requires-python = ">=3.5"
+authors = [
+    {name = "Nicolas Micaux", email = "micaux.nicolas@gmail.com"},
+]
+keywords = ["test", "regression", "automatically"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: Utilities",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "dill",
+]
+
+[project.urls]
+Homepage = "https://github.com/NicolasMICAUX/autotestreg"
+
+[project.scripts]
+autotest = "autotestreg.autotest:cmd"
+
+[tool.setuptools.packages.find]
+where = ["."]
