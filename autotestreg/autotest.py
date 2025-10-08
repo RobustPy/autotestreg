@@ -143,8 +143,38 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         all_inputs.append(inputs)
         all_outputs.append(outputs)
+
+        # Try to pickle normally, but be defensive: some outputs (exceptions,
+        # third-party objects) are not picklable. Fall back to safer
+        # representations when pickle fails.
+        def _safe_for_pickle(obj):
+            try:
+                pickle.dumps(obj)
+                return obj
+            except Exception:
+                # Try to return a stable hash if possible, otherwise a repr
+                try:
+                    return Hash(hash(obj))
+                except Exception:
+                    return repr(obj)
+
+        safe_all_inputs = []
+        for inp_args, inp_kwargs in all_inputs:
+            safe_args = tuple(_safe_for_pickle(a) for a in inp_args)
+            safe_kwargs = {k: _safe_for_pickle(v) for k, v in inp_kwargs.items()}
+            safe_all_inputs.append((safe_args, safe_kwargs))
+
+        safe_all_outputs = []
+        for out in all_outputs:
+            safe_all_outputs.append(_safe_for_pickle(out))
+
         with open(file_path, "wb") as f:
-            pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+            try:
+                pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+            except Exception:
+                # Last resort: dump sanitized versions so we don't crash the
+                # test collection step.
+                pickle.dump(FunctionAutoTest(safe_all_inputs, safe_all_outputs, code_hash), f)
 
         return outputs
 
@@ -153,19 +183,40 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
     return wrapper
 
 
-def autotest_module(module: ModuleType):
+def autotest_module(module: ModuleType, _visited: set = None, _root_name: str = None):
     """
     Replace all functions in a module with autotest versions.
+    Defensive: track visited modules to avoid infinite recursion and only
+    recurse into submodules that belong to the same package root. This
+    prevents descending into third-party packages (pytest, google, etc.)
+    which can cause recursion and expose unpicklable objects.
     :param module: the module to wrap
+    :param _visited: internal set of visited module ids
+    :param _root_name: the root module name to constrain recursion
     :return: the wrapped module
     """
-    for name, obj in module.__dict__.items():
+    if _visited is None:
+        _visited = set()
+    if _root_name is None:
+        _root_name = getattr(module, "__name__", "")
+
+    mid = id(module)
+    if mid in _visited:
+        return
+    _visited.add(mid)
+
+    for name, obj in list(module.__dict__.items()):
+        # Only wrap functions defined in this module
         if inspect.isfunction(obj) and not hasattr(obj, "__autotest__") and obj.__module__ == module.__name__:
             setattr(module, name, autotest_func(obj))
+        # Recurse into module attributes only if they are submodules of the same root
         elif isinstance(obj, ModuleType):
-            autotest_module(obj)
+            mod_name = getattr(obj, "__name__", "")
+            if mod_name and (mod_name == _root_name or mod_name.startswith(_root_name + ".")):
+                autotest_module(obj, _visited=_visited, _root_name=_root_name)
+        # Wrap methods of classes declared in this module
         elif inspect.isclass(obj) and obj.__module__ == module.__name__:
-            for method_name, m_obj in obj.__dict__.items():
+            for method_name, m_obj in list(obj.__dict__.items()):
                 if (
                     inspect.isfunction(m_obj)
                     and not hasattr(m_obj, "__autotest__")
