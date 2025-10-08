@@ -1,5 +1,7 @@
 import argparse
+import ast
 import difflib
+import hashlib
 import inspect
 import os
 import pickle
@@ -43,6 +45,114 @@ INTERACTIVE = True
 # Key: (module_name, function_name, old_code_hash, new_code_hash)
 # Value: bool (True if user accepted the change, False if rejected)
 _CODE_CHANGE_DECISIONS = {}
+
+
+def _deterministic_hash(text: str) -> int:
+    """
+    Create a deterministic hash that is stable across Python sessions.
+    Uses SHA-256 to create a consistent hash value.
+    :param text: the text to hash
+    :return: a deterministic integer hash
+    """
+    return int(hashlib.sha256(text.encode("utf-8")).hexdigest(), 16) % (2**63)
+
+
+def _normalize_code_for_hashing(source_code: str) -> str:
+    """
+    Normalize source code by removing comments and docstrings for hash comparison.
+    This allows ignoring docstring/comment-only changes.
+    :param source_code: the original source code
+    :return: normalized source code without comments and docstrings
+    """
+    try:
+        # Parse the source code into an AST
+        tree = ast.parse(source_code)
+
+        # Remove docstrings (first string literal in functions, classes, modules)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                # Remove docstring if present (first statement is a string)
+                if (
+                    node.body
+                    and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)
+                ):
+                    node.body = node.body[1:]
+            elif isinstance(node, ast.Module):
+                # Remove module-level docstring
+                if (
+                    node.body
+                    and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)
+                ):
+                    node.body = node.body[1:]
+
+        # Convert back to source code using ast.unparse (Python 3.9+)
+        try:
+            # Python 3.9+
+            normalized = ast.unparse(tree)
+            return normalized
+        except AttributeError:
+            # Fallback for older Python versions
+            return _normalize_code_simple_fallback(source_code)
+
+    except Exception:
+        # If AST parsing fails, fall back to simple comment removal
+        return _normalize_code_simple_fallback(source_code)
+
+
+def _normalize_code_simple_fallback(source_code: str) -> str:
+    """
+    Simple string-based normalization as fallback.
+    """
+    lines = source_code.split("\n")
+    normalized_lines = []
+    in_triple_quote = False
+    quote_type = None
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip empty lines and obvious comments
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        # Basic handling of triple-quoted strings (docstrings)
+        if '"""' in line or "'''" in line:
+            if not in_triple_quote:
+                # Check if this starts a docstring
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    quote_type = '"""' if '"""' in line else "'''"
+                    if line.count(quote_type) == 1:  # Opening triple quote
+                        in_triple_quote = True
+                        continue
+                    # else: single-line triple quote, skip it
+                    continue
+            else:
+                # We're in a triple quote, check if it closes
+                if quote_type and quote_type in line:
+                    in_triple_quote = False
+                    quote_type = None
+                continue
+
+        if in_triple_quote:
+            continue
+
+        # Remove inline comments (basic approach)
+        if "#" in line:
+            # Simple heuristic: remove # and everything after if not in quotes
+            quote_count = line.count('"') + line.count("'")
+            if quote_count % 2 == 0:  # Even number of quotes, likely not inside string
+                comment_pos = line.find("#")
+                if comment_pos >= 0:
+                    line = line[:comment_pos].rstrip()
+
+        if line.strip():
+            normalized_lines.append(line)
+
+    return "\n".join(normalized_lines)
 
 
 def set_interactive(interactive: bool = True) -> None:
@@ -141,7 +251,9 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
     # These do not depend on runtime args/kwargs, so computing them once
     # avoids repeated work and lets us ask the user at wrap-time.
     code_source = inspect.getsource(func)
-    code_hash = hash(code_source)
+    # Normalize code to ignore comment/docstring-only changes
+    normalized_code = _normalize_code_for_hashing(code_source)
+    code_hash = _deterministic_hash(normalized_code)
 
     file_path = os.path.join(
         autotest_path, *func.__module__.split("."), func.__name__ + ".pkl"
@@ -179,10 +291,30 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
                             func.__module__, func.__name__
                         )
                         _CODE_CHANGE_DECISIONS[decision_key] = ignore_code_change
-                    if ignore_code_change:
-                        # Accept the change: update the stored hash so new data will
-                        # be written with the new code hash.
-                        stored_code_hash = code_hash
+
+                    # Always update the stored hash when user makes a decision
+                    # This prevents re-asking the same question
+                    stored_code_hash = code_hash
+
+                    # If user says logic didn't change, we need to immediately update
+                    # the persisted data with the new hash to avoid asking again
+                    if not ignore_code_change:
+                        # Update the existing data with new hash
+                        updated_data = FunctionAutoTest(
+                            fn_autotest_data.all_inputs,
+                            fn_autotest_data.all_outputs,
+                            code_hash,
+                        )
+                        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                        with open(file_path, "wb") as f:
+                            try:
+                                _serializer_dump(updated_data, f)
+                            except Exception:
+                                try:
+                                    pickle.dump(updated_data, f)
+                                except Exception:
+                                    # If serialization fails, we'll handle it later
+                                    pass
                 else:
                     # hashes equal -> nothing to do
                     pass
