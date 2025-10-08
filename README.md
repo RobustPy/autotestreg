@@ -56,10 +56,9 @@ To follow a function `my_func`, this code is all you need:
 ```python
 from autotestreg import autotest_func
 
+@autotest_func
 def my_func():
     ...
-
-autotest_func(my_func)
 ```
 
 To track an entire module `mypackage`, with all the functions and methods it contains:
@@ -96,6 +95,9 @@ import mypackage
 autotest_module(mypackage)
 mypackage.main()
 ```
+
+## Use in python notebooks
+You can use AutoTest!Reg for functions defined in a python notebooks. Just add the import and the `autotest_func` decorators in your notebook cells.
 
 ## Advanced usage
 You can use AutoTest!Reg as a pre-commit hook:  

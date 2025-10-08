@@ -1,16 +1,17 @@
+import argparse
+import difflib
 import inspect
 import os
 import pickle
-from typing import Callable, List, Any
-from types import ModuleType
-import difflib
-import sys
-import argparse
 import shutil
+import sys
+from types import ModuleType
+from typing import Any, Callable, List, Optional
 
 # Prefer dill for robust serialization of arbitrary objects
 try:
     import dill as _serializer
+
     _SERIALIZER_NAME = "dill"
 except Exception:
     _serializer = pickle
@@ -35,7 +36,13 @@ def _serializer_dump(obj, f):
         # re-raise for caller to handle
         raise
 
+
 INTERACTIVE = True
+
+# Global dictionary to track user decisions about code changes per function
+# Key: (module_name, function_name, old_code_hash, new_code_hash)
+# Value: bool (True if user accepted the change, False if rejected)
+_CODE_CHANGE_DECISIONS = {}
 
 
 def set_interactive(interactive: bool = True) -> None:
@@ -89,10 +96,34 @@ def index_in_list(list_: List, item: Any) -> int:
 
 
 class FunctionAutoTest:
-    def __init__(self, all_inputs: List[Any], all_outputs: List[Any], code_hash: int) -> None:
+    def __init__(
+        self, all_inputs: List[Any], all_outputs: List[Any], code_hash: int
+    ) -> None:
         self.all_inputs = all_inputs
         self.all_outputs = all_outputs
         self.code_hash = code_hash
+
+
+def _ask_user_about_code_change(func_module: str, func_name: str) -> bool:
+    """
+    Ask the user if they want to accept a code change.
+    :param func_module: the module name
+    :param func_name: the function name
+    :return: True if user accepts the change (logic changed), False otherwise
+    """
+    if not INTERACTIVE:
+        return False
+
+    answer = ""
+    while answer not in {"y", "n"}:
+        answer = input(
+            "Function code changed in "
+            + func_module
+            + "/"
+            + func_name
+            + ". Has function logic changed? [y/n] "
+        ).lower()
+    return answer == "y"
 
 
 def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> Callable:
@@ -106,6 +137,65 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
     if hasattr(func, "__autotest__"):
         return func
 
+    # Precompute code source and hash once when wrapping the function.
+    # These do not depend on runtime args/kwargs, so computing them once
+    # avoids repeated work and lets us ask the user at wrap-time.
+    code_source = inspect.getsource(func)
+    code_hash = hash(code_source)
+
+    file_path = os.path.join(
+        autotest_path, *func.__module__.split("."), func.__name__ + ".pkl"
+    )
+
+    # stored_code_hash will be the code hash persisted with the data. If the user
+    # accepts a code change we will store the new hash here (so serialization
+    # at the end of wrapper uses the right value).
+    stored_code_hash = code_hash
+    # Default: don't ignore code changes unless user decided otherwise
+    ignore_code_change = False
+
+    # Determine initial decision now (at wrapping time). We only check and
+    # possibly ask the user once per unique (old_hash,new_hash) tuple.
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "rb") as f:
+                try:
+                    fn_autotest_data = _serializer_load(f)
+                except Exception:
+                    f.seek(0)
+                    fn_autotest_data = pickle.load(f)
+                old_code_hash = fn_autotest_data.code_hash
+                if code_hash != old_code_hash:
+                    decision_key = (
+                        func.__module__,
+                        func.__name__,
+                        old_code_hash,
+                        code_hash,
+                    )
+                    if decision_key in _CODE_CHANGE_DECISIONS:
+                        ignore_code_change = _CODE_CHANGE_DECISIONS[decision_key]
+                    else:
+                        ignore_code_change = _ask_user_about_code_change(
+                            func.__module__, func.__name__
+                        )
+                        _CODE_CHANGE_DECISIONS[decision_key] = ignore_code_change
+                    if ignore_code_change:
+                        # Accept the change: update the stored hash so new data will
+                        # be written with the new code hash.
+                        stored_code_hash = code_hash
+                else:
+                    # hashes equal -> nothing to do
+                    pass
+        except Exception:
+            # If loading fails, behave as if no prior data exists.
+            stored_code_hash = code_hash
+            old_code_hash = None
+            ignore_code_change = False
+    else:
+        # No file yet: nothing to compare
+        old_code_hash = None
+        ignore_code_change = False
+
     # noinspection PyUnresolvedReferences
     def wrapper(*args, **kwargs):
         """
@@ -116,13 +206,10 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
         """
         inputs = (args, kwargs)
         outputs = func(*args, **kwargs)
-        code_hash = inspect.getsource(func)
 
         # This saves ressources but makes the errors messages less readable
         # inputs = hash_if_possible(inputs)
         # outputs = hash_if_possible(outputs)
-
-        file_path = os.path.join(autotest_path, *func.__module__.split("."), func.__name__ + ".pkl")
 
         if os.path.exists(file_path):
             with open(file_path, "rb") as f:
@@ -138,21 +225,11 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
 
                 index = index_in_list(all_inputs, inputs)
                 if index >= 0:
-                    # If function code has changed, ask the user if they want to ignore the change
-                    ignore = False
+                    # If function code has changed, use the precomputed decision
                     if code_hash != old_code_hash:
-                        if INTERACTIVE:
-                            answered = False
-                            while not answered:
-                                answer = input(
-                                    "Function code changed in "
-                                    + func.__module__
-                                    + "/"
-                                    + func.__name__
-                                    + ". Has function logic changed? [y/n] "
-                                ).lower()
-                                answered = answer in {"y", "n"}
-                            ignore = answer == "y"
+                        ignore = ignore_code_change
+                    else:
+                        ignore = False
 
                     if ignore:  # We accept the change, hence we delete the old data
                         all_inputs.pop(index)
@@ -163,14 +240,21 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
                             return outputs
                         else:
                             diff_results = difflib.unified_diff(
-                                str(old_output).splitlines(keepends=True), str(outputs).splitlines(keepends=True)
+                                str(old_output).splitlines(keepends=True),
+                                str(outputs).splitlines(keepends=True),
                             )
                             sys.stderr.write("".join(diff_results))
                             # fail the test
-                            raise AssertionError("Output changed in " + func.__module__ + "/" + func.__name__)
+                            raise AssertionError(
+                                "Output changed in "
+                                + func.__module__
+                                + "/"
+                                + func.__name__
+                            )
         else:
             all_inputs = []
             all_outputs = []
+
         # in any other case, save the new output
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         all_inputs.append(inputs)
@@ -201,26 +285,37 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
             safe_all_outputs.append(_safe_for_pickle(out))
 
         with open(file_path, "wb") as f:
-            # Prefer the robust serializer; if it fails, try stdlib pickle; if
-            # that also fails, store the sanitized version using pickle.
+            # Persist using the stored_code_hash which may have been updated
+            # above if the user accepted a code change.
             try:
-                _serializer_dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+                _serializer_dump(
+                    FunctionAutoTest(all_inputs, all_outputs, stored_code_hash), f
+                )
             except Exception:
                 try:
-                    pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+                    pickle.dump(
+                        FunctionAutoTest(all_inputs, all_outputs, stored_code_hash), f
+                    )
                 except Exception:
                     # Last resort: dump sanitized versions so we don't crash the
                     # test collection step.
-                    pickle.dump(FunctionAutoTest(safe_all_inputs, safe_all_outputs, code_hash), f)
+                    pickle.dump(
+                        FunctionAutoTest(
+                            safe_all_inputs, safe_all_outputs, stored_code_hash
+                        ),
+                        f,
+                    )
 
         return outputs
 
     # add a custom attribute to the wrapper so that it can be identified as an autotest function
-    wrapper.__autotest__ = True
+    setattr(wrapper, "__autotest__", True)
     return wrapper
 
 
-def autotest_module(module: ModuleType, _visited: set = None, _root_name: str = None):
+def autotest_module(
+    module: ModuleType, _visited: Optional[set] = None, _root_name: Optional[str] = None
+):
     """
     Replace all functions in a module with autotest versions.
     Defensive: track visited modules to avoid infinite recursion and only
@@ -244,12 +339,20 @@ def autotest_module(module: ModuleType, _visited: set = None, _root_name: str = 
 
     for name, obj in list(module.__dict__.items()):
         # Only wrap functions defined in this module
-        if inspect.isfunction(obj) and not hasattr(obj, "__autotest__") and obj.__module__ == module.__name__:
+        if (
+            inspect.isfunction(obj)
+            and not hasattr(obj, "__autotest__")
+            and obj.__module__ == module.__name__
+        ):
             setattr(module, name, autotest_func(obj))
         # Recurse into module attributes only if they are submodules of the same root
         elif isinstance(obj, ModuleType):
             mod_name = getattr(obj, "__name__", "")
-            if mod_name and (mod_name == _root_name or mod_name.startswith(_root_name + ".")):
+            if (
+                mod_name
+                and _root_name
+                and (mod_name == _root_name or mod_name.startswith(_root_name + "."))
+            ):
                 autotest_module(obj, _visited=_visited, _root_name=_root_name)
         # Wrap methods of classes declared in this module
         elif inspect.isclass(obj) and obj.__module__ == module.__name__:
@@ -266,7 +369,9 @@ def cmd():
     parser = argparse.ArgumentParser(description="AutoTest Command Line Tool")
     parser.add_argument("command", choices=["delete"], help="Command to execute")
     parser.add_argument("target", choices=["cache"], help="Target to apply command to")
-    parser.add_argument("--cache", "-C", help="Specify cache folder", default="autotestreg_data")
+    parser.add_argument(
+        "--cache", "-C", help="Specify cache folder", default="autotestreg_data"
+    )
     args = parser.parse_args()
 
     if args.command == "delete" and args.target == "cache":
