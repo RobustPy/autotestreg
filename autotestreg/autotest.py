@@ -149,7 +149,7 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
                                     + func.__module__
                                     + "/"
                                     + func.__name__
-                                    + ". Ignore? [y/n] "
+                                    + ". Has function logic changed? [y/n] "
                                 ).lower()
                                 answered = answer in {"y", "n"}
                             ignore = answer == "y"
