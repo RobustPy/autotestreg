@@ -15,7 +15,7 @@ setup(
     author="Nicolas Micaux",
     author_email="micaux.nicolas@gmail.com",
     url="https://github.com/NicolasMICAUX/autotestreg",
-    install_requires=[],  # None
+    install_requires=["dill"],
     keywords=["test", "regression", "automatically"],
     classifiers=[
         "Development Status :: 3 - Alpha",

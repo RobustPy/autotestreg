@@ -8,6 +8,33 @@ import sys
 import argparse
 import shutil
 
+# Prefer dill for robust serialization of arbitrary objects
+try:
+    import dill as _serializer
+    _SERIALIZER_NAME = "dill"
+except Exception:
+    _serializer = pickle
+    _SERIALIZER_NAME = "pickle"
+
+
+def _serializer_load(f):
+    """Load using chosen serializer, falling back to pickle if necessary."""
+    try:
+        return _serializer.load(f)
+    except Exception:
+        # fallback to stdlib pickle
+        f.seek(0)
+        return pickle.load(f)
+
+
+def _serializer_dump(obj, f):
+    """Dump using chosen serializer, raise on failure to allow fallback handling."""
+    try:
+        return _serializer.dump(obj, f)
+    except Exception:
+        # re-raise for caller to handle
+        raise
+
 INTERACTIVE = True
 
 
@@ -99,7 +126,12 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
 
         if os.path.exists(file_path):
             with open(file_path, "rb") as f:
-                fn_autotest_data = pickle.load(f)
+                # try the more capable serializer first, fallback to stdlib pickle
+                try:
+                    fn_autotest_data = _serializer_load(f)
+                except Exception:
+                    f.seek(0)
+                    fn_autotest_data = pickle.load(f)
                 all_inputs = fn_autotest_data.all_inputs
                 all_outputs = fn_autotest_data.all_outputs
                 old_code_hash = fn_autotest_data.code_hash
@@ -169,12 +201,17 @@ def autotest_func(func: Callable, autotest_path: str = "autotestreg_data/") -> C
             safe_all_outputs.append(_safe_for_pickle(out))
 
         with open(file_path, "wb") as f:
+            # Prefer the robust serializer; if it fails, try stdlib pickle; if
+            # that also fails, store the sanitized version using pickle.
             try:
-                pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+                _serializer_dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
             except Exception:
-                # Last resort: dump sanitized versions so we don't crash the
-                # test collection step.
-                pickle.dump(FunctionAutoTest(safe_all_inputs, safe_all_outputs, code_hash), f)
+                try:
+                    pickle.dump(FunctionAutoTest(all_inputs, all_outputs, code_hash), f)
+                except Exception:
+                    # Last resort: dump sanitized versions so we don't crash the
+                    # test collection step.
+                    pickle.dump(FunctionAutoTest(safe_all_inputs, safe_all_outputs, code_hash), f)
 
         return outputs
 
